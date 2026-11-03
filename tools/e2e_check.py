@@ -212,6 +212,8 @@ def main(base):
               identity['badUpPaths'] == 0, '%d 个 GA 违反' % identity['badUpPaths'])
 
         # ---- 搜索 ----
+        # 先记画布位置，再打开联想面板；否则基准本身已经被面板推下去，检查失效。
+        base_graph = page.locator('.col.graph').bounding_box()
         page.fill('#search-input', 'netty')
         page.wait_for_timeout(1200)
         hits = page.locator('#result-list .dep-row').count()
@@ -219,20 +221,17 @@ def main(base):
 
         # ---- 选中一个依赖 → 画布出子图 ----
         # 联想面板浮在搜索框下方，只让结果列表内容下沉；画布不能整体下移。
-        base_graph = page.locator('.col.graph').bounding_box()
-        page.fill('#search-input', 'netty')
-        page.wait_for_timeout(1200)
         search_box = page.locator('#searchbox').bounding_box()
         pop_box = page.locator('#suggest-pop').bounding_box()
         graph_box = page.locator('.col.graph').bounding_box()
         row_box = page.locator('#result-list .dep-row').first.bounding_box()
+        pop_visible = page.locator('#suggest-pop').is_visible()
         aligned = (search_box and pop_box
                    and abs(pop_box['x'] - search_box['x']) <= 1
                    and abs(pop_box['width'] - search_box['width']) <= 2)
-        clears = (not page.locator('#suggest-pop').is_visible()
-                  or (aligned and row_box and pop_box and base_graph and graph_box
-                      and abs(graph_box['y'] - base_graph['y']) <= 1
-                      and row_box['y'] >= pop_box['y'] + pop_box['height'] - 1))
+        clears = (pop_visible and aligned and row_box and pop_box and base_graph and graph_box
+                  and abs(graph_box['y'] - base_graph['y']) <= 1
+                  and row_box['y'] >= pop_box['y'] + pop_box['height'] - 1)
         check('联想面板浮层不挤画布且首行可点', clears, '%s / %s / %s' % (search_box, pop_box, row_box))
         page.locator('#result-list .dep-row').first.click()
         page.wait_for_timeout(1200)

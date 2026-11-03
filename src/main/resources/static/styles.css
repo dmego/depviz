@@ -1287,7 +1287,12 @@ body.is-resizing * { cursor: col-resize !important; }
   padding: 0;
   contain: strict;
 }
-.vlist-spacer { width: 1px; padding-top: var(--suggest-pad, 0px); }
+.vlist-spacer {
+  /* 全局 * { box-sizing: border-box } 会让 padding 吃掉内联 height，必须改回
+     content-box，否则让位高度不进入 scrollHeight，滚到底要滚两次。 */
+  box-sizing: content-box;
+  width: 1px; padding-top: var(--suggest-pad, 0px);
+}
 .vlist-window {
   position: absolute; top: var(--suggest-pad, 0px); left: 0; right: 0;
   will-change: transform;

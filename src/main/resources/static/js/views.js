@@ -154,6 +154,11 @@
     // 行数变化时 start===first && end===last 会直接跳过，界面看起来没反应）
     let first = -1;
     let last = -1;
+    let pad = 0;
+
+    function readPad() {
+      pad = parseFloat(getComputedStyle(container).getPropertyValue('--suggest-pad')) || 0;
+    }
 
     container.classList.add('vlist');
     container.innerHTML =
@@ -164,7 +169,6 @@
     function paint() {
       const viewH = container.clientHeight || 600;
       const scrollTop = container.scrollTop;
-      const pad = parseFloat(getComputedStyle(container).getPropertyValue('--suggest-pad')) || 0;
       const start = Math.max(0, Math.floor(Math.max(0, scrollTop - pad) / ROW_H) - OVERSCAN);
       const end = Math.min(total, Math.ceil(Math.max(0, scrollTop - pad + viewH) / ROW_H) + OVERSCAN);
       if (start === first && end === last) return;
@@ -178,10 +182,16 @@
     }
 
     container.onscroll = function () { requestAnimationFrame(paint); };
-    container.__vlistRepaint = function () { first = -1; last = -1; paint(); };
+    container.__vlistRepaint = function () {
+      readPad();
+      first = -1; last = -1;
+      paint();
+    };
+    readPad();
     paint();
     // 容器尺寸可能还未定型（首次进入 / 面板宽度变化），下一帧再补一次
     requestAnimationFrame(function () {
+      readPad();
       first = -1; last = -1;
       paint();
     });
@@ -215,19 +225,24 @@
     pop.style.left = '';
     pop.style.width = '';
     pop.hidden = false;
-    if (list) {
-      const popRect = pop.getBoundingClientRect();
-      const listRect = list.getBoundingClientRect();
-      const pad = Math.max(0, Math.ceil(popRect.bottom + 4 - listRect.top));
-      // 虚拟列表的绝对定位窗口不响应容器 padding，用自定义属性让窗口和
-      // 占位块一起下移；普通列表退回 padding-top。
-      if (list.classList.contains('vlist')) {
-        list.scrollTop = 0;
-        list.style.setProperty('--suggest-pad', pad + 'px');
-        if (list.__vlistRepaint) list.__vlistRepaint();
-      } else {
-        list.style.paddingTop = pad + 'px';
-      }
+    if (!list) return true;
+
+    const popRect = pop.getBoundingClientRect();
+    const listRect = list.getBoundingClientRect();
+    const pad = Math.max(0, Math.ceil(popRect.bottom + 4 - listRect.top));
+    // 列表至少留一行在面板下方；连这一行都放不下时干脆收起面板，
+    // 否则短窗口里首行会被推到可视区外，面板却仍盖住整个列表。
+    const maxPad = Math.max(0, list.clientHeight - ROW_H);
+    if (pad > maxPad) return false;
+
+    // 虚拟列表的绝对定位窗口不响应容器 padding，用自定义属性让窗口和
+    // 占位块一起下移；普通列表退回 padding-top。
+    if (list.classList.contains('vlist')) {
+      list.scrollTop = 0;
+      list.style.setProperty('--suggest-pad', pad + 'px');
+      if (list.__vlistRepaint) list.__vlistRepaint();
+    } else {
+      list.style.paddingTop = pad + 'px';
     }
     return true;
   }
@@ -262,7 +277,10 @@
         '<span class="sg-text">' + markQuery(item.name, q) + '</span></button>';
     });
     pop.innerHTML = html;
-    placeSuggest(pop);
+    if (!placeSuggest(pop)) {
+      hideSuggest();
+      return;
+    }
     $('searchbox').setAttribute('aria-expanded', 'true');
 
     // 防止按下鼠标时输入框失焦、blur 的延时收起抢在 click 前面。
@@ -285,8 +303,12 @@
   function hideSuggest() {
     const pop = $('suggest-pop');
     if (!pop) return;
-    pop.hidden = true;
     const list = $('result-list');
+    const hasPad = list && (list.style.getPropertyValue('--suggest-pad') || list.style.paddingTop);
+    // 已经收起且没有让位空间时直接返回，避免 resize / 画布 mouseenter /
+    // 每次普通行点击都无意义地重建整个虚拟列表。
+    if (pop.hidden && !hasPad) return;
+    pop.hidden = true;
     if (list) {
       list.style.removeProperty('--suggest-pad');
       list.style.removeProperty('padding-top');

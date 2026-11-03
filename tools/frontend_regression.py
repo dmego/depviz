@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fourteen deterministic production Chrome regressions for review #10–17.
+"""Eighteen deterministic production Chrome regressions for review #10–17 and search fixes.
 
 Run: python3 tools/frontend_regression.py
 Requires Python Playwright, system Chrome, Java and a built target/depviz.jar.
@@ -406,7 +406,7 @@ def scan_terminal(s):
     assert not p.errors, p.errors
 
 
-def search(s):
+def search_page(s):
     p = s.page(query='?project=' + quote(A, safe=''))
     p.locator('#view-explore').wait_for(state='visible')
     # Observe the real renderer's input to await the 250 ms debounced search.
@@ -414,6 +414,16 @@ def search(s):
       const render=Views.renderResults;
       Views.renderResults=function(store,res) { __reg.renderedQuery=res.query; return render.apply(this,arguments); };
     }""")
+    return p
+
+
+def wait_search(p, query):
+    p.locator('#search-input').fill(query)
+    p.wait_for_function('(q) => __reg.renderedQuery === q', arg=query)
+
+
+def search(s):
+    p = search_page(s)
     for query in ('spcgtw', 'jkdb', 'springcloudgateway'):
         p.locator('#search-input').fill(query)
         p.wait_for_function('(q) => __reg.renderedQuery === q', arg=query)
@@ -425,35 +435,6 @@ def search(s):
         assert p.locator('#result-list .dep-row').count() == 2
         p.locator('#view-tree').click()
         assert p.locator('#result-list .dep-row').count() > 0
-    # 联想面板打开时：与搜索框同宽同左缘，浮在结果栏上方；
-    # 只把结果列表内容让到面板下方，画布和详情栏不能整体下移。
-    p.set_viewport_size({'width': 1200, 'height': 900})
-    base_list = p.locator('#result-list').bounding_box()
-    base_graph = p.locator('.col.graph').bounding_box()
-    p.locator('#search-input').fill('spring')
-    p.wait_for_function('(q) => __reg.renderedQuery === q', arg='spring')
-    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
-    p.wait_for_timeout(300)
-    box = p.locator('#searchbox').bounding_box()
-    pop_box = p.locator('#suggest-pop').bounding_box()
-    list_box = p.locator('#result-list').bounding_box()
-    graph_box = p.locator('.col.graph').bounding_box()
-    assert box and pop_box and list_box and base_list and base_graph and graph_box
-    assert abs(pop_box['x'] - box['x']) <= 1, (box, pop_box)
-    assert abs(pop_box['width'] - box['width']) <= 2, (box, pop_box)
-    assert abs(list_box['y'] - base_list['y']) <= 1, (base_list, list_box)
-    assert abs(graph_box['y'] - base_graph['y']) <= 1, (base_graph, graph_box)
-    row = p.locator('#result-list .dep-row').first
-    before = row.bounding_box()
-    assert before and before['y'] >= pop_box['y'] + pop_box['height'] - 1, (pop_box, before)
-    p.mouse.move(before['x'] + before['width'] / 2, before['y'] + before['height'] / 2)
-    p.mouse.down()
-    p.wait_for_timeout(250)  # 超过输入框 blur 的 120ms 延迟
-    assert p.locator('#suggest-pop').is_visible(), 'mousedown 后联想面板不应消失'
-    after = row.bounding_box()
-    assert before and after and abs(after['y'] - before['y']) <= 1, (before, after)
-    p.mouse.up()
-    assert 'is-selected' in (row.get_attribute('class') or '')
     # 匹配子串高亮：搜 ds，grpc-xds 中的 ds 必须被 <mark> 包住。
     p.locator('#search-input').fill('ds')
     p.wait_for_function('(q) => __reg.renderedQuery === q', arg='ds')
@@ -493,6 +474,110 @@ def search(s):
     }""")
     assert stats['search'] == 200 and stats['visible'] == 261 and stats['root'] == 1, stats
     assert not p.errors, p.errors
+
+
+def search_panel(s):
+    p = search_page(s)
+    p.set_viewport_size({'width': 1200, 'height': 900})
+    base_list = p.locator('#result-list').bounding_box()
+    base_graph = p.locator('.col.graph').bounding_box()
+    wait_search(p, 'spring')
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    p.wait_for_timeout(300)
+    box = p.locator('#searchbox').bounding_box()
+    pop_box = p.locator('#suggest-pop').bounding_box()
+    list_box = p.locator('#result-list').bounding_box()
+    graph_box = p.locator('.col.graph').bounding_box()
+    assert box and pop_box and list_box and base_list and base_graph and graph_box
+    assert abs(pop_box['x'] - box['x']) <= 1, (box, pop_box)
+    assert abs(pop_box['width'] - box['width']) <= 2, (box, pop_box)
+    assert abs(list_box['y'] - base_list['y']) <= 1, (base_list, list_box)
+    assert abs(graph_box['y'] - base_graph['y']) <= 1, (base_graph, graph_box)
+    row = p.locator('#result-list .dep-row').first
+    before = row.bounding_box()
+    assert before and before['y'] >= pop_box['y'] + pop_box['height'] - 1, (pop_box, before)
+    p.mouse.move(before['x'] + before['width'] / 2, before['y'] + before['height'] / 2)
+    p.mouse.down()
+    p.wait_for_timeout(250)  # 超过输入框 blur 的 120ms 延迟
+    assert p.locator('#suggest-pop').is_visible(), 'mousedown 后联想面板不应消失'
+    after = row.bounding_box()
+    assert before and after and abs(after['y'] - before['y']) <= 1, (before, after)
+    p.mouse.up()
+    assert 'is-selected' in (row.get_attribute('class') or '')
+    assert not p.errors, p.errors
+    p.close()
+
+
+def search_double_click(s):
+    p = search_page(s)
+    p.set_viewport_size({'width': 1200, 'height': 900})
+    wait_search(p, 'spring')
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    p.wait_for_timeout(300)
+    info = p.evaluate("""() => {
+      const rows=[...document.querySelectorAll('#result-list .occ-row')];
+      const row=rows.find(x => x.querySelector('[data-twisty]') && x.querySelector('.chev'));
+      if (!row) return null;
+      const box=row.getBoundingClientRect();
+      return {occ:Number(row.dataset.occ), x:box.x+box.width/2, y:box.y+box.height/2};
+    }""")
+    assert info, 'no expandable tree row'
+    # 第一次 click 会 renderList 重建 DOM，Chrome 不再派发 dblclick；
+    # 第二击的 detail=2 必须由 click 处理器直接折叠。
+    p.mouse.click(info['x'], info['y'], click_count=2)
+    p.wait_for_timeout(400)
+    assert p.evaluate('(occ) => !!(window.__treeCollapsed && window.__treeCollapsed.has(occ))', info['occ'])
+    assert p.locator('#suggest-pop').is_visible(), '双击后让位应保持到结果栏外点击'
+    assert not p.errors, p.errors
+    p.close()
+
+
+def search_suggest_and_small(s):
+    p = search_page(s)
+    p.set_viewport_size({'width': 1200, 'height': 900})
+    wait_search(p, 'ds')
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    p.wait_for_timeout(200)
+    p.locator('#suggest-pop .sg-item:not(.is-raw)').first.click()
+    assert p.input_value('#search-input') == 'grpc-xds'
+    assert p.evaluate('() => document.activeElement && document.activeElement.id') == 'search-input'
+    # 选中项 preventDefault 保住焦点，点输入框本身也要能重开。
+    p.locator('#search-input').click()
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    # 380px 高窗口：面板放不下时收起，结果首行必须仍可见；放得下时不能压住首行。
+    p.set_viewport_size({'width': 1200, 'height': 380})
+    wait_search(p, 'spring')
+    p.wait_for_timeout(300)
+    assert p.locator('#result-list .dep-row').count() > 0
+    if p.locator('#suggest-pop').is_visible():
+        row = p.locator('#result-list .dep-row').first.bounding_box()
+        pop = p.locator('#suggest-pop').bounding_box()
+        assert row and pop and row['y'] >= pop['y'] + pop['height'] - 1, (row, pop)
+    assert not p.errors, p.errors
+    p.close()
+
+
+def search_vlist_scroll(s):
+    p = search_page(s)
+    p.set_viewport_size({'width': 1200, 'height': 900})
+    wait_search(p, 'spring')
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    p.wait_for_timeout(300)
+    metrics = p.evaluate("""() => {
+      const list=document.querySelector('#result-list');
+      return {scrollHeight:list.scrollHeight, clientHeight:list.clientHeight,
+              pad:getComputedStyle(list).getPropertyValue('--suggest-pad')};
+    }""")
+    assert float(metrics['pad'].replace('px', '')) > 0, metrics
+    p.evaluate("() => { const list=document.querySelector('#result-list'); list.scrollTop=1e9; }")
+    p.wait_for_timeout(200)
+    actual = p.evaluate("""() => {
+      const list=document.querySelector('#result-list');
+      return {scrollTop:list.scrollTop, max:list.scrollHeight-list.clientHeight};
+    }""")
+    assert abs(actual['scrollTop'] - actual['max']) <= 1, (metrics, actual)
+    assert not p.errors, p.errors
+    p.close()
 
 
 def conflicts(s):
@@ -575,6 +660,10 @@ def main():
         s.check('#14 first canonical/symlink/invalid/cached deep link', lambda: deep_links(s))
         s.check('#13/#14 stale discovery and boot deep link', lambda: stale_deep_link(s))
         s.check('#15 fuzzy tree/flat uncapped matching production', lambda: search(s))
+        s.check('#15 suggestion panel geometry / mousedown', lambda: search_panel(s))
+        s.check('#15 double-click tree collapse survives row re-render', lambda: search_double_click(s))
+        s.check('#15 suggestion reopen after pick / short window', lambda: search_suggest_and_small(s))
+        s.check('#15 virtual list pad contributes to scroll height', lambda: search_vlist_scroll(s))
         s.check('#16 conflict reset on reopen production', lambda: conflicts(s))
         s.check('#17 failure/back/cached/rescan/cancel target production', lambda: rescan_reset(s))
         browser.close()

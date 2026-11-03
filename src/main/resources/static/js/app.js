@@ -1483,11 +1483,22 @@
     document.addEventListener('mousedown', function (e) {
       pointerOnResults = !!(e.target.closest && e.target.closest('#result-list'));
     }, true);
-    input.addEventListener('focus', function () {
+    document.addEventListener('mouseup', function (e) {
+      // 在结果栏外松开鼠标后清掉按下标记，避免一次“按下结果栏、松开别处”
+      // 让 blob 的延迟收起永久失效。
+      if (!(e.target.closest && e.target.closest('#result-list'))) pointerOnResults = false;
+    }, true);
+    function openSuggest() {
       suggestSuppressed = false;
       if (input.value.trim() && lastSearch) {
         V.renderSuggest(state.store, input.value, lastSearch.results, applySuggest);
       }
+    }
+    input.addEventListener('focus', openSuggest);
+    // 选中联想项时 pop.onmousedown 的 preventDefault 会保住输入框焦点，
+    // 之后再点输入框不会触发 focus，需要 click 单独重开。
+    input.addEventListener('click', function () {
+      if ($('suggest-pop').hidden) openSuggest();
     });
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
@@ -1582,28 +1593,27 @@
         const set = global.__treeCollapsed || (global.__treeCollapsed = new Set());
         if (set.has(occId)) set.delete(occId); else set.add(occId);
         renderList();
-        V.hideSuggest();
-        pointerOnResults = false;
+        // 不收起联想：收起会让结果行在鼠标抬起前上移。
         e.stopPropagation();
         return;
       }
       const row = e.target.closest('.dep-row');
       if (!row) { V.hideSuggest(); pointerOnResults = false; return; }
-      // 双击的第二下不再 toggle：第一下已选中，第二下若再 toggle 会把它取消，
-      // 随后 dblclick 又折叠树，看起来就像「双击没选中」。
-      if (e.detail > 1) { V.hideSuggest(); pointerOnResults = false; return; }
+      if (e.detail > 1) {
+        // 第一次 click 的 toggleGa() 会 renderList() 重建行 DOM，Chrome 在
+        // 目标元素被替换后不再派发 dblclick。双击折叠只能在这里处理：
+        // 第二击的 detail 仍为 2，新行元素带着同样的 data-occ。
+        if (e.detail === 2 && row.dataset.occ != null) {
+          const occId = Number(row.dataset.occ);
+          const set = global.__treeCollapsed || (global.__treeCollapsed = new Set());
+          if (set.has(occId)) set.delete(occId); else set.add(occId);
+          renderList();
+        }
+        return;
+      }
       toggleGa(row.dataset.ga, e.metaKey || e.ctrlKey || e.shiftKey);
-      V.hideSuggest();
-      pointerOnResults = false;
-    });
-    // 双击树节点切换折叠（Maven Helper 的习惯）
-    listEl.addEventListener('dblclick', function (e) {
-      const row = e.target.closest('.occ-row');
-      if (!row) return;
-      const occId = Number(row.dataset.occ);
-      const set = global.__treeCollapsed || (global.__treeCollapsed = new Set());
-      if (set.has(occId)) set.delete(occId); else set.add(occId);
-      renderList();
+      // 不收起联想：让位一旦消失，结果行会在双击的第二下之前上移，
+      // 第二击就落到别的行。让位保留到点击结果栏以外的位置。
     });
 
     $('results-empty').addEventListener('click', function (e) {
