@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="depviz">
+  <title>depviz</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="0.7" stop-color="#2359da"/>
+      <stop offset="1" stop-color="#2359da"/>
+    </linearGradient>
+    <clipPath id="mark" clipPathUnits="objectBoundingBox">
+      <polygon points="0,0 0.55,0 0.55,0.45 1,0.45 1,1 0,1"/>
+    </clipPath>
+  </defs>
+  <rect width="96" height="96" rx="25.4" fill="url(#bg)"/>
+  <g clip-path="url(#mark)">
+    <rect x="25.4" y="25.4" width="45.2" height="45.2" rx="8.5"
+          fill="rgba(255,255,255,0.35)" stroke="#ffffff" stroke-width="4.2"/>
+  </g>
+</svg>

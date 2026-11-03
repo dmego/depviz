@@ -1,0 +1,65 @@
+{
+  "project": {
+    "id": "multi", "name": "multi", "rootDir": "projects/multi",
+    "maven": "", "jdk": "", "plugin": "", "profiles": [],
+    "offline": true, "xmx": "", "threads": "", "moduleCount": 4,
+    "declaredDependencyCount": 1, "seconds": 0.0, "incomplete": false,
+    "graphMode": "TREE", "parseCoverage": 1.0, "warnings": [], "command": ""
+  },
+  "gas": [
+    {"g": "fixture.multi", "a": "lib", "v": ["1.0"]},
+    {"g": "org.slf4j", "a": "slf4j-api", "v": ["1.7.36", "1.6.0", "2.0.13"]},
+    {"g": "fixture.deps", "a": "legacy", "v": ["1.0"]},
+    {"g": "fixture.deps", "a": "repeat", "v": ["1.0"]},
+    {"g": "fixture.deps", "a": "native", "v": ["3.0"]},
+    {"g": "fixture.multi", "a": "multi-parent", "v": ["1.0"]},
+    {"g": "fixture.multi", "a": "util", "v": ["1.0"]},
+    {"g": "fixture.deps", "a": "standalone", "v": ["4.0"]},
+    {"g": "fixture.multi", "a": "app", "v": ["1.0"]},
+    {"g": "fixture.deps", "a": "branch", "v": ["1.0"]},
+    {"g": "fixture.deps", "a": "first", "v": ["1.0"]},
+    {"g": "fixture.deps", "a": "choice", "v": ["1.0", "2.0"]},
+    {"g": "fixture.deps", "a": "second", "v": ["1.0"]}
+  ],
+  "occ": [
+    {"i": 0, "p": -1, "ga": 0, "v": 0, "e": 1, "m": 0, "t": "jar"},
+    {"i": 1, "p": 0, "ga": 1, "v": 0, "e": 1, "m": 0, "t": "jar", "s": "compile"},
+    {"i": 2, "p": 0, "ga": 2, "v": 0, "e": 1, "m": 0, "t": "jar", "s": "compile"},
+    {"i": 3, "p": 2, "ga": 1, "v": 1, "e": 0, "m": 0, "t": "jar", "s": "compile", "o": "conflict", "ob": "1.7.36", "ann": "omitted for conflict with 1.7.36"},
+    {"i": 4, "p": 0, "ga": 3, "v": 0, "e": 1, "m": 0, "t": "jar", "s": "compile"},
+    {"i": 5, "p": 4, "ga": 1, "v": 0, "e": 0, "m": 0, "t": "jar", "s": "compile", "o": "duplicate", "ann": "omitted for duplicate"},
+    {"i": 6, "p": 0, "ga": 4, "v": 0, "e": 1, "m": 0, "t": "jar", "c": "linux-x86_64", "s": "runtime", "vm": "2.5", "sm": "compile", "snu": "test", "ann": "version managed from 2.5; scope managed from compile; scope not updated to test; fixture note"},
+    {"i": 7, "p": -1, "ga": 5, "v": 0, "e": 1, "m": 1, "t": "pom"},
+    {"i": 8, "p": -1, "ga": 6, "v": 0, "e": 1, "m": 2, "t": "jar"},
+    {"i": 9, "p": 8, "ga": 7, "v": 0, "e": 1, "m": 2, "t": "jar", "s": "provided"},
+    {"i": 10, "p": -1, "ga": 8, "v": 0, "e": 1, "m": 3, "t": "pom"},
+    {"i": 11, "p": 10, "ga": 1, "v": 2, "e": 1, "m": 3, "t": "jar", "s": "compile"},
+    {"i": 12, "p": 10, "ga": 9, "v": 0, "e": 1, "m": 3, "t": "jar", "s": "compile"},
+    {"i": 13, "p": 12, "ga": 2, "v": 0, "e": 1, "m": 3, "t": "jar", "s": "compile"},
+    {"i": 14, "p": 13, "ga": 1, "v": 1, "e": 0, "m": 3, "t": "jar", "s": "compile", "o": "conflict", "ob": "2.0.13", "ann": "omitted for conflict with 2.0.13"},
+    {"i": 15, "p": 10, "ga": 10, "v": 0, "e": 1, "m": 3, "t": "jar", "s": "compile"},
+    {"i": 16, "p": 15, "ga": 11, "v": 0, "e": 1, "m": 3, "t": "jar", "s": "compile"},
+    {"i": 17, "p": 10, "ga": 12, "v": 0, "e": 1, "m": 3, "t": "jar", "s": "compile"},
+    {"i": 18, "p": 17, "ga": 11, "v": 1, "e": 0, "m": 3, "t": "jar", "s": "compile", "o": "conflict", "ob": "1.0", "ann": "omitted for conflict with 1.0"}
+  ],
+  "moduleRoots": [0, 7, 8, 10],
+  "modules": [
+    {
+      "groupId": "fixture.multi", "artifactId": "lib", "packaging": "jar",
+      "relPath": "lib", "pomPath": "lib/pom.xml", "declaredDeps": 1, "childCount": 0,
+      "declared": [{"groupId": "org.slf4j", "artifactId": "slf4j-api", "version": "1.7.36", "scope": "", "optional": ""}]
+    },
+    {
+      "groupId": "fixture.multi", "artifactId": "multi-parent", "packaging": "pom",
+      "relPath": ".", "pomPath": "pom.xml", "declaredDeps": 0, "childCount": 2, "declared": []
+    },
+    {
+      "groupId": "fixture.multi", "artifactId": "util", "packaging": "jar",
+      "relPath": "app/util", "pomPath": "app/util/pom.xml", "declaredDeps": 0, "childCount": 0, "declared": []
+    },
+    {
+      "groupId": "fixture.multi", "artifactId": "app", "packaging": "pom",
+      "relPath": "app", "pomPath": "app/pom.xml", "declaredDeps": 0, "childCount": 1, "declared": []
+    }
+  ]
+}

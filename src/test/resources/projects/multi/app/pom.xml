@@ -1,0 +1,5 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>
+  <parent><groupId>fixture.multi</groupId><artifactId>multi-parent</artifactId><version>1.0</version></parent>
+  <artifactId>app</artifactId><packaging>pom</packaging>
+  <modules><module>util</module></modules>
+</project>

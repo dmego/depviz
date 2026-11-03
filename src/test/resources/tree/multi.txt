@@ -1,0 +1,19 @@
+fixture.multi:lib:jar:1.0
++- org.slf4j:slf4j-api:jar:1.7.36:compile
++- fixture.deps:legacy:jar:1.0:compile
+|  \- (org.slf4j:slf4j-api:jar:1.6.0:compile - omitted for conflict with 1.7.36)
++- fixture.deps:repeat:jar:1.0:compile
+|  \- (org.slf4j:slf4j-api:jar:1.7.36:compile - omitted for duplicate)
+\- fixture.deps:native:jar:linux-x86_64:3.0:runtime (version managed from 2.5; scope managed from compile; scope not updated to test; fixture note)
+fixture.multi:multi-parent:pom:1.0
+fixture.multi:util:jar:1.0
+\- fixture.deps:standalone:jar:4.0:provided
+fixture.multi:app:pom:1.0
++- org.slf4j:slf4j-api:jar:2.0.13:compile
++- fixture.deps:branch:jar:1.0:compile
+|  \- fixture.deps:legacy:jar:1.0:compile
+|     \- (org.slf4j:slf4j-api:jar:1.6.0:compile - omitted for conflict with 2.0.13)
++- fixture.deps:first:jar:1.0:compile
+|  \- fixture.deps:choice:jar:1.0:compile
+\- fixture.deps:second:jar:1.0:compile
+   \- (fixture.deps:choice:jar:2.0:compile - omitted for conflict with 1.0)

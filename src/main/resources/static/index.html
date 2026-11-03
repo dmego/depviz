@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>depviz · Maven 依赖来源分析</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M8 22V10h5l6 12h5V10' fill='none' stroke='%23fff' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+  <!-- 主题必须在解析 <body> 之前定下来。放在 app.js 里的话，用户选了深色也会先按
+       浅色彩排一帧再跳过去 —— 每次打开都闪一下。 -->
+  <script>try{var t=localStorage.getItem("depviz.theme");if(!t)t=matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4l2 2.5h7A2.5 2.5 0 0 1 21 10v6.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 15l5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M10 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="17.4" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.1-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M19 4.5V10h-5.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37 1 .608 2.296.07 2.572-1.065z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-panel-left" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 4v16" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-panel-right" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15 4v16" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M9 5H5v4M15 19h4v-4M5 9l5-5M19 15l-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-contract" viewBox="0 0 24 24"><path d="M9 4v5H4M15 20v-5h5M4 9h5M20 15h-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="8" r=".95" fill="currentColor"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-module" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-focus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6 7v6l-4 2v-8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13m0 0l-5-5m5 5l-5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============ 状态 A：选项目 ============ -->
+<main id="view-select" class="select-view">
+  <div class="select-tools">
+    <button class="icon-btn" id="btn-theme-home" title="切换深色 / 浅色"><svg class="icon" aria-hidden="true"><use href="#i-moon" id="theme-icon-home"/></svg></button>
+    <button class="icon-btn" id="btn-settings-home" title="设置"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
+  </div>
+  <div class="select-inner">
+  <section class="stage" id="stage-pick">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>depviz</h1>
+        <p class="lede">Maven 依赖来源分析<span class="lede-sep">/</span>搜一个包名，看它是怎么被拉进来的</p>
+      </div>
+    </div>
+
+    <button class="pick-btn" id="btn-pick">
+      <svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>
+      <span class="pick-main">选择 Maven 项目目录</span>
+      <span class="pick-sub">在页面里逐层浏览，也可以粘贴路径</span>
+    </button>
+
+    <div class="path-row">
+      <label for="path-input">或直接输入路径</label>
+      <div class="path-field">
+        <input id="path-input" type="text" spellcheck="false" placeholder="/Users/you/project">
+        <button class="icon-btn" id="btn-path-go" aria-label="打开该路径"><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+      </div>
+    </div>
+
+    <section class="recent">
+      <h2>最近打开</h2>
+      <ul id="recent-list" class="recent-list"></ul>
+    </section>
+
+    <details class="advanced" id="adv-panel">
+      <summary>高级设置<span class="adv-hint">Maven 路径、JAVA_HOME、settings.xml、profile</span></summary>
+      <dl class="adv-grid" id="adv-grid">
+        <dt>Maven</dt><dd><code id="adv-mvn">…</code></dd>
+        <dt>JAVA_HOME</dt><dd><code id="adv-java">…</code></dd>
+        <dt>settings.xml</dt><dd><code id="adv-settings">…</code></dd>
+        <dt>本地仓库</dt><dd><code id="adv-repo">…</code></dd>
+        <dt>profiles</dt><dd><code id="adv-profiles">…</code></dd>
+        <dt>离线</dt><dd><code id="adv-offline">…</code></dd>
+        <dt>堆上限</dt><dd><code id="adv-xmx">…</code></dd>
+        <dt>并行度</dt><dd><code id="adv-threads">…</code></dd>
+        <dt>日志</dt><dd><code id="adv-log">…</code></dd>
+      </dl>
+    </details>
+  </section>
+
+  <section class="stage stage-confirm" id="stage-confirm" hidden>
+    <div class="located">
+      <svg class="icon ok" aria-hidden="true"><use href="#i-check"/></svg>
+      <div>
+        <h2 id="confirm-title">已定位到项目</h2>
+        <p id="confirm-sub" class="muted"></p>
+        <p id="confirm-relocated" class="relocated" hidden></p>
+      </div>
+    </div>
+
+    <div class="module-panel">
+      <div class="module-head"><span>模块</span><span>打包</span><span>直接依赖</span></div>
+      <ul id="module-list" class="module-list"></ul>
+      <div class="module-foot"><span id="module-count"></span><button class="link" id="btn-confirm-more">展开全部</button></div>
+    </div>
+
+    <div class="confirm-actions">
+      <button class="btn" id="btn-confirm-back">换一个目录</button>
+      <button class="btn primary" id="btn-scan">开始分析</button>
+    </div>
+  </section>
+
+  <section class="stage stage-scan" id="stage-scan" hidden>
+    <div class="scan-head">
+      <h2 id="scan-title">正在分析</h2>
+      <p class="muted" id="scan-sub"></p>
+    </div>
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <div class="scan-meta">
+      <span id="scan-pct">0%</span>
+      <span class="dot-sep"></span>
+      <span id="scan-elapsed">已用 0.0s</span>
+      <span class="grow"></span>
+      <button class="link" id="btn-log-toggle" aria-expanded="true">收起 Maven 输出</button>
+    </div>
+    <pre class="scan-log" id="scan-log"></pre>
+    <div class="scan-actions" id="scan-actions-running">
+      <button class="btn" id="btn-scan-cancel">取消</button>
+      <!-- 409（别的扫描在跑）时留着用户在扫描页，用这个按钮重试；
+           普通失败会退回选目录页，用不上它 -->
+      <button class="btn primary" id="btn-scan-retry" hidden>重试</button>
+    </div>
+    <!-- 失败面板：留在扫描页直接把原因摊开，而不是一句 toast 就退回选目录页。
+         用户点「开始分析」等了几分钟，需要知道到底哪一步出了问题 —— 尤其是
+         Maven 的报错（离线缺依赖 / BOM 解析不了 / 仓库连不上）全都埋在日志里。 -->
+    <div class="scan-fail" id="scan-fail" hidden>
+      <div class="scan-fail-head">
+        <svg class="icon warn" aria-hidden="true"><use href="#i-warn"/></svg>
+        <span id="scan-fail-title">分析失败</span>
+      </div>
+      <p class="scan-fail-msg" id="scan-fail-msg"></p>
+      <!-- 完整日志的落盘位置。上面那个折叠面板只有最后 200 行，而失败时
+           真正要查的东西（Maven 全部输出 + 解析不了的树文件）都在 data/ 下。 -->
+      <p class="scan-fail-path" id="scan-fail-path" hidden>
+        <span>完整日志</span><code id="scan-fail-path-val"></code>
+      </p>
+      <details class="scan-fail-more" id="scan-fail-more">
+        <summary>Maven 输出（最后 200 行）</summary>
+        <pre id="scan-fail-detail"></pre>
+      </details>
+      <div class="scan-fail-actions">
+        <button class="btn" id="btn-scan-back">换一个目录</button>
+        <button class="btn" id="btn-scan-online">联网重试</button>
+        <button class="btn primary" id="btn-scan-retry2">再试一次</button>
+      </div>
+    </div>
+    <div class="scan-done" id="scan-done" hidden>
+      <div class="scan-done-head">
+        <svg class="icon ok" aria-hidden="true"><use href="#i-check"/></svg>
+        <span>分析完成</span>
+      </div>
+      <p class="scan-done-meta" id="scan-done-meta"></p>
+      <div class="scan-done-actions">
+        <button class="btn" id="btn-scan-again">重新扫描</button>
+        <button class="btn primary" id="btn-view-result">查看结果 →</button>
+      </div>
+    </div>
+  </section>
+  </div>
+</main>
+
+<!-- ============ 状态 B：分析 ============ -->
+<div id="view-explore" class="explore" hidden>
+  <header class="topbar">
+    <div class="project-picker">
+      <button class="project-switch" id="btn-project" aria-haspopup="menu" aria-expanded="false">
+        <svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg>
+        <span id="project-name"></span>
+        <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+      </button>
+      <div class="project-menu" id="project-menu" role="menu" hidden>
+        <button class="pm-new" id="pm-new" role="menuitem">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>
+          <span>分析新项目</span>
+        </button>
+        <div class="pm-sep"></div>
+        <div class="pm-head">最近分析</div>
+        <ul class="pm-list" id="pm-list"></ul>
+      </div>
+    </div>
+
+    <div class="search-group">
+    <div class="searchbox" id="searchbox" role="combobox" aria-expanded="false" aria-controls="suggest-pop" aria-autocomplete="list">
+      <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="search-input" type="text" spellcheck="false" autocomplete="off"
+             placeholder="搜索 groupId / artifactId，如 netty" aria-label="搜索依赖"
+             aria-autocomplete="list" aria-controls="suggest-pop">
+      <kbd>⌘K</kbd>
+      <button class="icon-btn clear" id="btn-search-clear" aria-label="清空搜索" hidden><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      <div class="suggest-pop" id="suggest-pop" role="listbox" hidden></div>
+    </div>
+
+    <div class="module-picker">
+      <button class="module-btn" id="btn-modules" aria-haspopup="dialog" aria-expanded="false">
+        <svg class="icon" aria-hidden="true"><use href="#i-module"/></svg>
+        <span id="module-btn-label">全部模块</span>
+        <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+      </button>
+      <div class="module-pop" id="module-pop" hidden role="dialog" aria-label="选择模块">
+        <div class="mp-head">
+          <input id="mp-filter" type="text" placeholder="过滤模块" spellcheck="false" aria-label="过滤模块">
+        </div>
+        <div class="mp-actions">
+          <button class="link" id="mp-all">全选</button>
+          <button class="link" id="mp-none">清空</button>
+          <span class="grow"></span>
+          <span class="mp-count" id="mp-count"></span>
+        </div>
+        <div class="mp-tree" id="mp-tree" role="tree"></div>
+        <div class="mp-foot">
+          <span class="mp-hint" id="mp-hint"></span>
+          <button class="btn primary sm" id="mp-apply">应用</button>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <div class="segmented" role="tablist" aria-label="视图">
+      <button role="tab" id="tab-paths" aria-selected="true">依赖路径</button>
+      <button role="tab" id="tab-conflicts" aria-selected="false">版本冲突</button>
+    </div>
+    <button class="icon-btn" id="btn-theme" title="切换深色 / 浅色"><svg class="icon" aria-hidden="true"><use href="#i-moon" id="theme-icon"/></svg></button>
+    <button class="icon-btn" id="btn-rescan" title="重新扫描"><svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg></button>
+    <button class="icon-btn" id="btn-meta-bar" title="显示 / 隐藏扫描信息" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg></button>
+    <button class="icon-btn" id="btn-settings" title="设置"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
+  </header>
+
+  <div class="metabar" id="metabar">
+    <button class="meta-line" id="btn-meta" title="查看本次扫描详情">
+      <svg class="icon meta-warn" id="meta-warn-icon" aria-hidden="true" hidden><use href="#i-warn"/></svg>
+      <span id="meta-text"></span>
+      <span class="meta-more">详情</span>
+    </button>
+    <button class="btn sm" id="btn-retry-online" hidden title="以离线模式关闭的方式重跑一次">
+      <svg class="icon" aria-hidden="true"><use href="#i-refresh"/></svg>联网重试
+    </button>
+  </div>
+
+  <div class="workspace" id="pane-paths">
+    <aside class="col results" aria-label="搜索结果">
+      <div class="col-head">
+        <span id="results-title">全部依赖</span>
+        <span class="col-head-actions">
+          <div class="segmented xs" role="group" aria-label="列表视图">
+            <button id="view-flat" aria-pressed="false">列表</button>
+            <button id="view-tree" aria-pressed="true">树状</button>
+          </div>
+          <button class="icon-btn sm" id="btn-list-opts" title="显示选项" aria-label="显示选项" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-sliders"/></svg></button>
+          <button class="icon-btn sm" id="btn-collapse-left" title="收起左栏" aria-label="收起左栏"><svg class="icon" aria-hidden="true"><use href="#i-panel-left"/></svg></button>
+        </span>
+      </div>
+      <div class="list-opts" id="list-opts" hidden>
+        <label class="opt-row"><input type="checkbox" id="opt-groupid" checked><span>显示 groupId</span></label>
+        <label class="opt-row"><input type="checkbox" id="opt-scope" checked><span>显示 scope</span></label>
+        <label class="opt-row"><input type="checkbox" id="opt-test" checked><span>隐藏 test 依赖</span></label>
+        <label class="opt-row"><input type="checkbox" id="opt-provided" checked><span>隐藏 provided 依赖</span></label>
+      </div>
+      <ul class="result-list" id="result-list"></ul>
+      <div class="col-empty" id="results-empty">
+        <p>输入一个片段开始查找。</p>
+        <p class="muted">例如 <button class="chip" data-q="netty">netty</button><button class="chip" data-q="jackson">jackson</button><button class="chip" data-q="db">db</button></p>
+      </div>
+      <div class="resizer right-edge" id="rs-left" title="拖动调整宽度，双击复位" role="separator" aria-orientation="vertical" aria-label="调整左栏宽度"></div>
+    </aside>
+
+    <section class="col graph" aria-label="依赖图">
+      <div class="graph-tools">
+        <button class="icon-btn sm rail-toggle" id="btn-expand-left" title="展开左栏" aria-label="展开左栏" hidden><svg class="icon" aria-hidden="true"><use href="#i-panel-left"/></svg></button>
+        <span class="graph-scope" id="graph-scope">未选择依赖</span>
+        <span class="grow"></span>
+        <button class="tool-btn" id="btn-fit" title="缩放到全部节点">全图</button>
+        <button class="tool-btn" id="btn-focus" title="聚焦到搜索结果">聚焦</button>
+        <button class="tool-btn" id="btn-fullscreen" title="画布全屏"><svg class="icon" aria-hidden="true"><use href="#i-expand" id="fs-icon"/></svg><span id="fs-label">全屏</span></button>
+        <button class="icon-btn sm rail-toggle" id="btn-expand-right" title="展开右栏" aria-label="展开右栏" hidden><svg class="icon" aria-hidden="true"><use href="#i-panel-right"/></svg></button>
+      </div>
+      <div class="banner" id="common-banner" hidden></div>
+      <div class="canvas" id="cy"></div>
+      <div class="node-tip" id="node-tip" hidden></div>
+      <div class="graph-empty" id="graph-empty">
+        <span class="ge-logo" aria-hidden="true"></span>
+        <p class="ge-brand">depviz</p>
+        <p class="ge-title">从左侧选择一个依赖</p>
+        <p class="ge-sub">画布只画这个依赖的全部引入路径，按坐标聚合</p>
+      </div>
+      <div class="legend" id="legend">
+        <span><i class="lg-root"></i>项目模块</span>
+        <span><i class="lg-target"></i>目标依赖</span>
+        <span><i class="lg-path"></i>当前路径</span>
+        <span><i class="lg-omit"></i>无效路径</span>
+      </div>
+    </section>
+
+    <aside class="col detail" aria-label="节点详情">
+      <div class="col-head">
+        <span>详情</span>
+        <button class="icon-btn sm" id="btn-collapse-right" title="收起右栏" aria-label="收起右栏"><svg class="icon" aria-hidden="true"><use href="#i-panel-right"/></svg></button>
+      </div>
+      <div class="detail-body" id="detail-body">
+        <p class="placeholder">点画布上的节点，或左侧的结果，查看坐标、版本与影响范围。</p>
+      </div>
+      <div class="resizer left-edge" id="rs-right" title="拖动调整宽度，双击复位" role="separator" aria-orientation="vertical" aria-label="调整右栏宽度"></div>
+    </aside>
+  </div>
+
+  <div class="conflicts-pane" id="pane-conflicts" hidden>
+    <div class="conflict-head">
+      <div class="conflict-title"><strong id="conflict-count">0</strong> 个坐标存在多版本<span class="muted" id="conflict-sub"></span></div>
+      <label class="switch toggle-inline">
+        <input type="checkbox" id="chk-rewritten">
+        <span class="toggle-track sm" aria-hidden="true"><span class="toggle-thumb"></span></span>
+        <span class="toggle-text">只看版本被取代</span>
+      </label>
+    </div>
+    <div class="table-wrap">
+      <table class="conflict-table">
+        <thead><tr><th>坐标</th><th colspan="2">版本分布</th></tr></thead>
+        <tbody id="conflict-body"></tbody>
+      </table>
+    </div>
+    <p class="table-note">「各模块不同」：这些模块各自用了不同版本，每个模块内都是正确的——它们不是冲突，只是没统一。「版本被取代」：该版本在任何模块里都没生效，被其他版本取代。</p>
+  </div>
+
+  <footer class="drawer" id="drawer">
+    <div class="drawer-head">
+      <button class="drawer-toggle" id="btn-drawer" aria-expanded="true">
+        <svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg>
+        <span id="drawer-title">路径列表</span>
+      </button>
+      <span class="drawer-sub" id="drawer-sub"></span>
+      <span class="filter-chip" id="path-filter-chip" hidden>
+        <span id="path-filter-label"></span>
+        <button class="icon-btn sm" id="btn-clear-filter" aria-label="清除过滤"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      </span>
+      <span class="grow"></span>
+      <label class="switch toggle-inline" title="只显示生效的路径">
+        <input type="checkbox" id="chk-effective" checked>
+        <span class="toggle-track sm" aria-hidden="true"><span class="toggle-thumb"></span></span>
+        <span class="toggle-text">只看生效</span>
+      </label>
+    </div>
+    <div class="drawer-body" id="drawer-body"><div class="path-list" id="path-list"></div></div>
+  </footer>
+</div>
+
+<!-- ============ 弹层 ============ -->
+<div class="modal-mask" id="mask" hidden></div>
+
+<div class="modal" id="dlg-pick" hidden role="dialog" aria-modal="true" aria-labelledby="pick-title">
+  <div class="modal-head"><h2 id="pick-title">选择项目目录</h2><button class="icon-btn" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <!-- 上一级 / 主目录 / 路径输入。输入框是 Windows 用户的必需品：一路「上一级」
+       点到 C:\ 之后就没有父目录了，光靠点击永远到不了 D 盘。 -->
+  <div class="dir-bar">
+    <button class="icon-btn" id="btn-dir-up" title="上一级" aria-label="上一级"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+    <button class="icon-btn" id="btn-dir-home" title="回到主目录" aria-label="回到主目录"><svg class="icon" aria-hidden="true"><use href="#i-folder"/></svg></button>
+    <div class="dir-path">
+      <input id="dir-input" type="text" spellcheck="false" placeholder="输入路径后回车跳转" aria-label="目录路径">
+      <button class="icon-btn" id="btn-dir-go" title="跳到这个路径" aria-label="跳到这个路径"><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+    </div>
+  </div>
+  <!-- 盘符条：Windows 上每个盘一项，其他系统只有 / 一项，此时整条隐藏。 -->
+  <div class="dir-roots" id="dir-roots" hidden></div>
+  <nav class="dir-crumbs" id="dir-crumbs" aria-label="当前路径"></nav>
+  <p class="modal-note" id="dir-note">点目录进去，选到项目根（有 pom.xml 的那一层）后点「使用此目录」。</p>
+  <ul class="dir-list" id="dir-list"></ul>
+  <div class="modal-foot">
+    <span class="muted small" id="dir-status"></span>
+    <button class="btn" data-close>取消</button>
+    <button class="btn primary" id="btn-dir-use">使用此目录</button>
+  </div>
+</div>
+
+<div class="modal" id="dlg-meta" hidden role="dialog" aria-modal="true" aria-labelledby="meta-title">
+  <div class="modal-head"><h2 id="meta-title">本次扫描详情</h2><button class="icon-btn" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <div class="modal-body" id="meta-body"></div>
+  <div class="modal-foot"><button class="btn" id="btn-copy-cmd">复制命令行</button></div>
+</div>
+
+<div class="modal" id="dlg-modules" hidden role="dialog" aria-modal="true" aria-labelledby="modules-title">
+  <div class="modal-head">
+    <h2 id="modules-title">模块分布</h2>
+    <button class="icon-btn" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <div class="modal-body" id="modules-body"></div>
+  <div class="modal-foot">
+    <span class="muted small" id="modules-note"></span>
+    <button class="btn" id="btn-only-these">只看这些模块</button>
+  </div>
+</div>
+
+<div class="modal" id="dlg-settings" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="modal-head"><h2 id="settings-title">设置</h2><button class="icon-btn" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+  <div class="modal-body settings-body">
+    <section class="settings-section">
+      <h3>环境</h3>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-mvn">Maven 可执行路径</label><p>留空用 PATH 里的 <code>mvn</code>。填 <code>bin\mvn.cmd</code> 或整个安装目录都行 —— 目录会自动往下找 <code>bin</code></p></div>
+        <input id="s-mvn" placeholder="留空用 PATH 里的 mvn">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-java">JAVA_HOME</label><p>留空继承当前环境</p></div>
+        <input id="s-java" placeholder="继承当前环境">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-settings">settings.xml</label><p>默认读取 ~/.m2/settings.xml</p></div>
+        <input id="s-settings" placeholder="默认 ~/.m2/settings.xml">
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-repo">本地仓库</label><p>透传 -Dmaven.repo.local</p></div>
+        <input id="s-repo" placeholder="默认 ~/.m2/repository">
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>扫描选项</h3>
+      <div class="setting-row is-toggle">
+        <div class="setting-label">
+          <label for="s-offline">离线模式</label>
+          <p>透传 <code>-o</code>，完全不访问远程仓库。只在依赖都已缓存在本地时开；开了以后 BOM / build extension 解析不了的项目会直接失败。</p>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="s-offline">
+          <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-profiles">Profiles</label><p>逗号分隔，逐个透传 <code>-P</code></p></div>
+        <input id="s-profiles" placeholder="例如 dev,cloud">
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>Maven 子进程</h3>
+      <div class="setting-row">
+        <div class="setting-label">
+          <label for="s-xmx">堆上限</label>
+          <p>给 <code>MAVEN_OPTS</code> 注入 <code>-Xmx</code>。自动 = 按物理内存分档；不注入 = 交给 Maven 自己算（物理内存 / 4，大机器上会很贪）。你自己的 <code>MAVEN_OPTS</code> 已含 <code>-Xmx</code> 时不覆盖</p>
+        </div>
+        <select id="s-xmx">
+          <option value="auto">自动（按物理内存分档）</option>
+          <option value="512m">512 MB</option>
+          <option value="768m">768 MB</option>
+          <option value="1024m">1 GB</option>
+          <option value="2048m">2 GB</option>
+          <option value="4096m">4 GB</option>
+          <option value="off">不注入</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label">
+          <label for="s-threads">并行度</label>
+          <p>透传 Maven 的 <code>-T</code>，多模块项目按模块并行解析。串行最稳；并行会快一些，但模块树里的行序与「version managed from」这类注记挂在哪一行会变（计数与结论不变）。<code>2C</code> / <code>4C</code> 表示按核数换算</p>
+        </div>
+        <select id="s-threads">
+          <option value="">串行（默认）</option>
+          <option value="2">2 线程</option>
+          <option value="4">4 线程</option>
+          <option value="8">8 线程</option>
+          <option value="2C">每核 2 线程（2C）</option>
+          <option value="4C">每核 4 线程（4C）</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>存储</h3>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-data">数据目录</label><p>每个项目一个子目录，放扫描产物</p></div>
+        <input id="s-data" value="~/.depviz">
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>日志</h3>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-loglevel">控制台级别</label><p>直接运行时打在终端上的详细程度</p></div>
+        <select id="s-loglevel">
+          <option value="debug">debug · 接口调用与耗时</option>
+          <option value="info">info · 启动、扫描、错误（默认）</option>
+          <option value="warn">warn · 只打警告与错误</option>
+          <option value="error">error · 只打错误</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <div class="setting-label"><label for="s-fileloglevel">文件级别</label><p><code>logs/depviz.log</code> 的详细程度。后台运行时终端上没有输出，排障只看这个文件</p></div>
+        <select id="s-fileloglevel">
+          <option value="debug">debug · 接口调用与耗时</option>
+          <option value="info">info · 启动、扫描、错误（默认）</option>
+          <option value="warn">warn · 只打警告与错误</option>
+          <option value="error">error · 只打错误</option>
+        </select>
+      </div>
+    </section>
+  </div>
+  <div class="modal-foot"><span class="muted small" id="settings-note">持久化到 config.json</span><button class="btn primary" id="btn-settings-save">保存</button></div>
+</div>
+
+<div class="modal wide" id="dlg-pom" hidden role="dialog" aria-modal="true" aria-labelledby="pom-title">
+  <div class="modal-head">
+    <h2 id="pom-title" class="mono">pom.xml</h2>
+    <button class="icon-btn" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <div class="modal-body pom-modal-body" id="pom-body"></div>
+  <div class="modal-foot">
+    <span class="muted small" id="pom-note"></span>
+  </div>
+</div>
+
+<div class="modal" id="dlg-declared" hidden role="dialog" aria-modal="true" aria-labelledby="declared-title">
+  <div class="modal-head">
+    <h2 id="declared-title">声明依赖</h2>
+    <button class="icon-btn" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <div class="modal-body" id="declared-body"></div>
+  <div class="modal-foot">
+    <span class="muted small" id="declared-note"></span>
+  </div>
+</div>
+
+<div class="modal wide" id="dlg-vexp" hidden role="dialog" aria-modal="true" aria-labelledby="vexp-title">
+  <div class="modal-head">
+    <h2 id="vexp-title">版本为什么没有生效</h2>
+    <button class="icon-btn" data-close aria-label="关闭"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <div class="modal-body" id="vexp-body"></div>
+  <div class="modal-foot">
+    <span class="muted small mono" id="vexp-note"></span>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/cytoscape.min.js"></script>
+<script src="vendor/dagre.min.js"></script>
+<script src="vendor/cytoscape-dagre.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/graph.js"></script>
+<script src="js/views.js"></script>
+<script src="js/module-picker.js"></script>
+<script src="js/scan.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
