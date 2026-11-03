@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" width="104" height="104" alt="depviz logo">
+  <img src="images/logo.svg" width="104" height="104" alt="depviz logo">
 </p>
 
 <h1 align="center">depviz</h1>
@@ -20,6 +20,10 @@ depviz 是一个本地运行的 Maven 依赖分析工具。选择一个 Maven �
 
 扫描过程只读：不会构建或修改目标工程，所有数据都保存在本机。
 
+## 界面预览
+
+![depviz 界面截图](images/shot.png)
+
 ## 功能
 
 - **依赖路径**：选中任意依赖，列出从各模块根到它的全部引入路径，并按深度排序。
@@ -31,7 +35,7 @@ depviz 是一个本地运行的 Maven 依赖分析工具。选择一个 Maven �
 
 ## 架构
 
-![depviz 架构与数据流](docs/depviz-architecture.png)
+![depviz 架构与数据流](images/depviz-architecture.png)
 
 从项目发现、Maven 扫描、依赖树解析到浏览器渲染的完整数据流。
 
@@ -114,7 +118,7 @@ src/
 ├── main/resources/static/   前端页面与静态资源
 └── test/                    单元测试与测试数据
 tools/                       构建校验与端到端脚本
-docs/                        架构图与项目 Logo
+images/                      界面截图、架构图与项目 Logo
 ```
 
 ## 开发
