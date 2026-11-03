@@ -85,8 +85,16 @@
 
     const vis = new Uint8Array(n);
     for (let i = n - 1; i >= 0; i--) {
-      if (!allowed[i]) continue;
-      let v = selfMatch[i];
+      if (!needle) {
+        // 没有搜索词：只按模块 / scope 过滤显示完整树。
+        if (allowed[i]) vis[i] = 1;
+        continue;
+      }
+      // 有搜索词：只显示命中的节点和它们到根之间的引入链。
+      // 链上的节点即使自己被 scope 过滤，也不能把后代整段剪掉——否则「搜索结果
+      // 有 1 个坐标、树里 0 行」：例如 spring-aop 自身是 compile，但它只出现在
+      // sofa-boot(test) → runtime-sofa-boot(test) 这条链下。
+      let v = allowed[i] && selfMatch[i] ? 1 : 0;
       if (!v) {
         const kids = store.children.get(i);
         if (kids) {

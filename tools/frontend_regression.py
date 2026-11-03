@@ -425,6 +425,64 @@ def search(s):
         assert p.locator('#result-list .dep-row').count() == 2
         p.locator('#view-tree').click()
         assert p.locator('#result-list .dep-row').count() > 0
+    # 联想面板打开时：与搜索框同宽同左缘，浮在结果栏上方；
+    # 只把结果列表内容让到面板下方，画布和详情栏不能整体下移。
+    p.set_viewport_size({'width': 1200, 'height': 900})
+    base_list = p.locator('#result-list').bounding_box()
+    base_graph = p.locator('.col.graph').bounding_box()
+    p.locator('#search-input').fill('spring')
+    p.wait_for_function('(q) => __reg.renderedQuery === q', arg='spring')
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    p.wait_for_timeout(300)
+    box = p.locator('#searchbox').bounding_box()
+    pop_box = p.locator('#suggest-pop').bounding_box()
+    list_box = p.locator('#result-list').bounding_box()
+    graph_box = p.locator('.col.graph').bounding_box()
+    assert box and pop_box and list_box and base_list and base_graph and graph_box
+    assert abs(pop_box['x'] - box['x']) <= 1, (box, pop_box)
+    assert abs(pop_box['width'] - box['width']) <= 2, (box, pop_box)
+    assert abs(list_box['y'] - base_list['y']) <= 1, (base_list, list_box)
+    assert abs(graph_box['y'] - base_graph['y']) <= 1, (base_graph, graph_box)
+    row = p.locator('#result-list .dep-row').first
+    before = row.bounding_box()
+    assert before and before['y'] >= pop_box['y'] + pop_box['height'] - 1, (pop_box, before)
+    p.mouse.move(before['x'] + before['width'] / 2, before['y'] + before['height'] / 2)
+    p.mouse.down()
+    p.wait_for_timeout(250)  # 超过输入框 blur 的 120ms 延迟
+    assert p.locator('#suggest-pop').is_visible(), 'mousedown 后联想面板不应消失'
+    after = row.bounding_box()
+    assert before and after and abs(after['y'] - before['y']) <= 1, (before, after)
+    p.mouse.up()
+    assert 'is-selected' in (row.get_attribute('class') or '')
+    # 匹配子串高亮：搜 ds，grpc-xds 中的 ds 必须被 <mark> 包住。
+    p.locator('#search-input').fill('ds')
+    p.wait_for_function('(q) => __reg.renderedQuery === q', arg='ds')
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    p.wait_for_timeout(300)
+    marks = p.evaluate("() => [...document.querySelectorAll('#suggest-pop mark')].map(m => m.textContent.toLowerCase())")
+    assert 'ds' in marks, marks
+    p.locator('#suggest-pop .sg-item:not(.is-raw)').first.click()
+    assert p.input_value('#search-input') == 'grpc-xds'
+    assert p.locator('#result-list .dep-row.is-selected').count() == 1
+    # 精确命中叶子、但祖先被 scope 过滤隐藏时，树视图仍要有可点的引入链。
+    p.locator('#search-input').fill('spring-aop')
+    p.wait_for_function('(q) => __reg.renderedQuery === q', arg='spring-aop')
+    p.wait_for_timeout(300)
+    assert p.locator('#result-list .dep-row').count() > 0
+    leaf = p.locator('#result-list .dep-row').last
+    leaf.click()
+    assert 'is-selected' in (leaf.get_attribute('class') or '')
+    # 1000px 窄一些的桌面窗口里，面板仍要和搜索框对齐。
+    p.set_viewport_size({'width': 1000, 'height': 900})
+    p.locator('#search-input').fill('spring')
+    p.wait_for_function('(q) => __reg.renderedQuery === q', arg='spring')
+    p.wait_for_function("() => !document.querySelector('#suggest-pop').hidden")
+    p.wait_for_timeout(300)
+    box = p.locator('#searchbox').bounding_box()
+    pop_box = p.locator('#suggest-pop').bounding_box()
+    assert box and pop_box
+    assert abs(pop_box['x'] - box['x']) <= 1, (box, pop_box)
+    assert abs(pop_box['width'] - box['width']) <= 2, (box, pop_box)
     stats = p.evaluate("""() => {
       const n=260, gas=[{g:'root',a:'parent',v:['1']}], occ=[{i:0,p:-1,ga:0,v:0,e:1,m:0,t:'jar'}];
       for(let i=1;i<=n;i++) { gas.push({g:'group',a:'fuzzy-match-'+i,v:['1']}); occ.push({i,p:0,ga:i,v:0,e:1,m:0,t:'jar',s:'compile'}); }

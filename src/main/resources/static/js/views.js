@@ -164,8 +164,9 @@
     function paint() {
       const viewH = container.clientHeight || 600;
       const scrollTop = container.scrollTop;
-      const start = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN);
-      const end = Math.min(total, Math.ceil((scrollTop + viewH) / ROW_H) + OVERSCAN);
+      const pad = parseFloat(getComputedStyle(container).getPropertyValue('--suggest-pad')) || 0;
+      const start = Math.max(0, Math.floor(Math.max(0, scrollTop - pad) / ROW_H) - OVERSCAN);
+      const end = Math.min(total, Math.ceil(Math.max(0, scrollTop - pad + viewH) / ROW_H) + OVERSCAN);
       if (start === first && end === last) return;
       first = start;
       last = end;
@@ -177,6 +178,7 @@
     }
 
     container.onscroll = function () { requestAnimationFrame(paint); };
+    container.__vlistRepaint = function () { first = -1; last = -1; paint(); };
     paint();
     // 容器尺寸可能还未定型（首次进入 / 面板宽度变化），下一帧再补一次
     requestAnimationFrame(function () {
@@ -187,6 +189,49 @@
 
   /* ---------- 搜索联想 ---------- */
 
+  /** 用 <mark> 标出建议项里与输入匹配的子串。 */
+  function markQuery(text, q) {
+    const lower = String(text).toLowerCase();
+    const needle = String(q).toLowerCase();
+    if (!needle) return esc(text);
+    let out = '';
+    let pos = 0;
+    while (true) {
+      const idx = lower.indexOf(needle, pos);
+      if (idx < 0) break;
+      out += esc(text.slice(pos, idx)) + '<mark>' + esc(text.slice(idx, idx + needle.length)) + '</mark>';
+      pos = idx + needle.length;
+    }
+    return out + esc(text.slice(pos));
+  }
+
+  /**
+   * 联想面板浮在搜索框正下方，不改变顶栏和画布布局。
+   * 只把左栏结果列表的内容向下让开——面板盖住的是结果栏顶部，
+   * 让开后才能点到下面的结果行；画布和详情栏保持原位。
+   */
+  function placeSuggest(pop) {
+    const list = $('result-list');
+    pop.style.left = '';
+    pop.style.width = '';
+    pop.hidden = false;
+    if (list) {
+      const popRect = pop.getBoundingClientRect();
+      const listRect = list.getBoundingClientRect();
+      const pad = Math.max(0, Math.ceil(popRect.bottom + 4 - listRect.top));
+      // 虚拟列表的绝对定位窗口不响应容器 padding，用自定义属性让窗口和
+      // 占位块一起下移；普通列表退回 padding-top。
+      if (list.classList.contains('vlist')) {
+        list.scrollTop = 0;
+        list.style.setProperty('--suggest-pad', pad + 'px');
+        if (list.__vlistRepaint) list.__vlistRepaint();
+      } else {
+        list.style.paddingTop = pad + 'px';
+      }
+    }
+    return true;
+  }
+
   /**
    * 下拉建议：第一项是用户原词（直接搜索），后面是匹配到的 artifactId。
    */
@@ -195,14 +240,15 @@
     const q = query.trim();
     if (!q) { hideSuggest(); return; }
 
-    const names = results.slice(0, 12).map(function (r) { return r.artifactId; });
-    // 去重并排除与用户输入完全相同的项
+    // 去重并排除与用户输入完全相同的项；带上 gaId，点选时直接选中该坐标，
+    // 不再靠「第一条结果恰好同名」来猜。
     const seen = new Set();
     const items = [];
-    names.forEach(function (n) {
+    results.slice(0, 12).forEach(function (r) {
+      const n = r.artifactId;
       if (seen.has(n) || n === q) return;
       seen.add(n);
-      items.push(n);
+      items.push({ name: n, gaId: r.gaId });
     });
 
     if (!items.length && !results.length) { hideSuggest(); return; }
@@ -211,23 +257,27 @@
       '<svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>' +
       '<span class="sg-text">' + esc(q) + '</span>' +
       '<span class="sg-hint">搜索全部匹配</span></button>';
-    items.forEach(function (n, i) {
-      html += '<button class="sg-item" data-name="' + esc(n) + '" role="option">' +
-        '<span class="sg-text">' + esc(n) + '</span></button>';
+    items.forEach(function (item) {
+      html += '<button class="sg-item" data-name="' + esc(item.name) + '" data-ga="' + item.gaId + '" role="option">' +
+        '<span class="sg-text">' + markQuery(item.name, q) + '</span></button>';
     });
     pop.innerHTML = html;
-    pop.hidden = false;
+    placeSuggest(pop);
     $('searchbox').setAttribute('aria-expanded', 'true');
 
+    // 防止按下鼠标时输入框失焦、blur 的延时收起抢在 click 前面。
+    pop.onmousedown = function (e) {
+      if (e.target.closest('.sg-item')) e.preventDefault();
+    };
     pop.onclick = function (e) {
       const btn = e.target.closest('.sg-item');
       if (!btn) return;
       hideSuggest();
       if (btn.dataset.raw) {
-        onPick(q);
+        onPick(q, null);
       } else {
         $('search-input').value = btn.dataset.name;
-        onPick(btn.dataset.name);
+        onPick(btn.dataset.name, btn.dataset.ga ? Number(btn.dataset.ga) : null);
       }
     };
   }
@@ -236,6 +286,12 @@
     const pop = $('suggest-pop');
     if (!pop) return;
     pop.hidden = true;
+    const list = $('result-list');
+    if (list) {
+      list.style.removeProperty('--suggest-pad');
+      list.style.removeProperty('padding-top');
+      if (list.__vlistRepaint) list.__vlistRepaint();
+    }
     $('searchbox').setAttribute('aria-expanded', 'false');
   }
 

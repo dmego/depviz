@@ -1287,9 +1287,9 @@ body.is-resizing * { cursor: col-resize !important; }
   padding: 0;
   contain: strict;
 }
-.vlist-spacer { width: 1px; }
+.vlist-spacer { width: 1px; padding-top: var(--suggest-pad, 0px); }
 .vlist-window {
-  position: absolute; top: 0; left: 0; right: 0;
+  position: absolute; top: var(--suggest-pad, 0px); left: 0; right: 0;
   will-change: transform;
 }
 
@@ -1382,9 +1382,9 @@ body.is-resizing * { cursor: col-resize !important; }
 .searchbox { position: relative; }
 .topbar { position: relative; z-index: 20; }
 .searchbox .suggest-pop {
-  position: absolute; top: calc(100% + 4px); left: 0; z-index: 35;
-  width: 100%;
-  max-height: 300px; overflow: auto;
+  /* 与搜索框同宽同左缘，浮层显示；打开时 views.js 让结果列表内容下移，画布和详情不动 */
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 35;
+  box-sizing: border-box; max-height: 300px; overflow: auto;
   padding: 4px;
   background: var(--surface); border: 1px solid var(--line-strong);
   border-radius: var(--r); box-shadow: var(--shadow);
@@ -1408,6 +1408,7 @@ body.is-resizing * { cursor: col-resize !important; }
 .sg-item.is-raw .sg-text { color: var(--fg); font-weight: 600; }
 .sg-item.is-raw .icon { color: var(--accent); }
 .sg-hint { flex: none; font-size: 10.5px; color: var(--fg-3); }
+.suggest-pop mark { background: var(--accent); color: var(--on-accent); font-weight: 700; border-radius: 2px; padding: 0 1px; }
 
 /* ============================================================
    元数据条折叠

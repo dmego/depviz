@@ -39,6 +39,7 @@
 
   let lastSearch = null;
   let suggestSuppressed = false;
+  let pointerOnResults = false;   // 按下鼠标时是否落在结果栏，用于延迟的 blur 收起判断
   let lastPaths = null;
   /** 一个作用域只允许当前操作更新界面；开始新操作或退出时统一作废旧回调。 */
   function asyncScope() {
@@ -668,17 +669,25 @@
 
   /**
    * 选中联想项：用完整 artifactId 搜索并选中该坐标。
+   * gaId 由建议项直接带过来，不依赖「搜索结果第一条恰好同名」——同名 artifactId
+   * 可能属于多个 groupId，排在第一条的不一定是用户点的那个。
    * 注意顺序——必须先置 suggestSuppressed，否则 doSearch 里看到输入框仍聚焦，
    * 会重新弹出下拉，表现为「点了没反应」。
    */
-  function applySuggest(text) {
+  function applySuggest(text, gaId) {
     suggestSuppressed = true;
     $('search-input').value = text;
     doSearch();
     V.hideSuggest();
-    const first = lastSearch.results[0];
-    if (first && first.artifactId === text) {
-      state.selected = [first.gaId];
+    let chosen = null;
+    if (gaId != null) {
+      chosen = lastSearch.results.find(function (r) { return r.gaId === gaId; }) || null;
+    }
+    if (!chosen) {
+      chosen = lastSearch.results.find(function (r) { return r.artifactId === text; }) || null;
+    }
+    if (chosen) {
+      state.selected = [chosen.gaId];
       renderList();
       refreshSelection();
     }
@@ -1465,9 +1474,15 @@
       debouncedSearch();
     });
     input.addEventListener('blur', function () {
-      // 延迟关闭，让下拉项的 click 先触发
-      setTimeout(V.hideSuggest, 120);
+      // 延迟关闭，让下拉项的 click 先触发；点在结果栏上时不能收——
+      // 否则结果列表的让位空间先消失、结果行在鼠标抬起前上移，点击会落到别的行上。
+      setTimeout(function () {
+        if (!pointerOnResults) V.hideSuggest();
+      }, 120);
     });
+    document.addEventListener('mousedown', function (e) {
+      pointerOnResults = !!(e.target.closest && e.target.closest('#result-list'));
+    }, true);
     input.addEventListener('focus', function () {
       suggestSuppressed = false;
       if (input.value.trim() && lastSearch) {
@@ -1567,12 +1582,19 @@
         const set = global.__treeCollapsed || (global.__treeCollapsed = new Set());
         if (set.has(occId)) set.delete(occId); else set.add(occId);
         renderList();
+        V.hideSuggest();
+        pointerOnResults = false;
         e.stopPropagation();
         return;
       }
       const row = e.target.closest('.dep-row');
-      if (!row) return;
+      if (!row) { V.hideSuggest(); pointerOnResults = false; return; }
+      // 双击的第二下不再 toggle：第一下已选中，第二下若再 toggle 会把它取消，
+      // 随后 dblclick 又折叠树，看起来就像「双击没选中」。
+      if (e.detail > 1) { V.hideSuggest(); pointerOnResults = false; return; }
       toggleGa(row.dataset.ga, e.metaKey || e.ctrlKey || e.shiftKey);
+      V.hideSuggest();
+      pointerOnResults = false;
     });
     // 双击树节点切换折叠（Maven Helper 的习惯）
     listEl.addEventListener('dblclick', function (e) {
@@ -1897,13 +1919,18 @@
 
     // 鼠标进入画布即收起搜索联想，避免挡住图
     $('cy').addEventListener('mouseenter', function () { V.hideSuggest(); });
+    // 窗口尺寸变化后左栏宽度可能变，旧位置可能重新压住结果列表
+    global.addEventListener('resize', function () { V.hideSuggest(); });
 
     global.Graph.onNodeTap(onNodeTap);
 
-    // 点击工作区其他位置时收起联想
+    // 点击工作区其他位置时收起联想。结果栏除外：mousedown 就收起会让结果
+    // 列表的让位空间消失、结果行在鼠标抬起前整体上移，点击落到别的行上——
+    // 看起来就是「点了没反应」。结果栏内的收起交给 click 处理，此时选中已经生效。
     document.addEventListener('mousedown', function (e) {
       if ($('suggest-pop').hidden) return;
       if (e.target.closest('#searchbox') || e.target.closest('#suggest-pop')) return;
+      if (e.target.closest('#result-list')) return;
       V.hideSuggest();
     });
   }

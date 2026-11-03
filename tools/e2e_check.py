@@ -213,22 +213,27 @@ def main(base):
 
         # ---- 搜索 ----
         page.fill('#search-input', 'netty')
-        page.press('#search-input', 'Enter')
         page.wait_for_timeout(1200)
-        page.press('#search-input', 'Escape')
-        page.wait_for_timeout(300)
         hits = page.locator('#result-list .dep-row').count()
         check('搜索 netty 有结果', hits > 0, '%d 行' % hits)
 
         # ---- 选中一个依赖 → 画布出子图 ----
-        # 走真实用户路径：输入 + 回车（只 fill 会让联想下拉挡住左栏）
+        # 联想面板浮在搜索框下方，只让结果列表内容下沉；画布不能整体下移。
+        base_graph = page.locator('.col.graph').bounding_box()
         page.fill('#search-input', 'netty')
-        page.press('#search-input', 'Enter')
         page.wait_for_timeout(1200)
-        # 联想下拉会盖住左栏，按 Esc 收起。
-        page.press('#search-input', 'Escape')
-        page.wait_for_timeout(300)
-        check('Esc 收起联想下拉', not page.locator('#suggest-pop').is_visible())
+        search_box = page.locator('#searchbox').bounding_box()
+        pop_box = page.locator('#suggest-pop').bounding_box()
+        graph_box = page.locator('.col.graph').bounding_box()
+        row_box = page.locator('#result-list .dep-row').first.bounding_box()
+        aligned = (search_box and pop_box
+                   and abs(pop_box['x'] - search_box['x']) <= 1
+                   and abs(pop_box['width'] - search_box['width']) <= 2)
+        clears = (not page.locator('#suggest-pop').is_visible()
+                  or (aligned and row_box and pop_box and base_graph and graph_box
+                      and abs(graph_box['y'] - base_graph['y']) <= 1
+                      and row_box['y'] >= pop_box['y'] + pop_box['height'] - 1))
+        check('联想面板浮层不挤画布且首行可点', clears, '%s / %s / %s' % (search_box, pop_box, row_box))
         page.locator('#result-list .dep-row').first.click()
         page.wait_for_timeout(1200)
         nodes = page.evaluate('window.Graph.cy ? window.Graph.cy.nodes().length : -1')
